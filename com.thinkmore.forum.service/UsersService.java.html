@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UsersService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">forum</a> &gt; <a href="index.source.html" class="el_package">com.thinkmore.forum.service</a> &gt; <span class="el_source">UsersService.java</span></div><h1>UsersService.java</h1><pre class="source lang-java linenums">package com.thinkmore.forum.service;
+
+import com.thinkmore.forum.dto.users.*;
+import com.thinkmore.forum.entity.JwtUser;
+import com.thinkmore.forum.configuration.StaticConfig;
+import com.thinkmore.forum.entity.Roles;
+import com.thinkmore.forum.entity.Users;
+import com.thinkmore.forum.exception.InvalidOldPasswordException;
+import com.thinkmore.forum.exception.UserNotFoundException;
+import com.thinkmore.forum.mapper.UsersMapper;
+import com.thinkmore.forum.repository.RolesRepository;
+import com.thinkmore.forum.repository.UsersRepository;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@Service
+<span class="nc" id="L31">@RequiredArgsConstructor</span>
+public class UsersService implements UserDetailsService {
+
+    @Autowired
+    PasswordEncoder passwordEncoder;
+
+    private final UsersRepository usersRepository;
+    private final UsersMapper usersMapper;
+    private final RolesRepository rolesRepository;
+
+    //only for jwt
+    @Override
+    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
+<span class="nc" id="L44">        Users user = usersRepository.findByEmail(email).orElseThrow(() -&gt;</span>
+<span class="nc" id="L45">                new UsernameNotFoundException(String.format(&quot;Login Email %s not found&quot;, email)));</span>
+<span class="nc" id="L46">        return new JwtUser(user);</span>
+    }
+
+    @Transactional
+    public Boolean register(UsersPostDto usersPostDto) {
+<span class="nc" id="L51">        Users user = usersMapper.toEntity(usersPostDto);</span>
+
+<span class="nc" id="L53">        user.setUsername(usersPostDto.getUsername());</span>
+<span class="nc" id="L54">        user.setPassword(passwordEncoder.encode(usersPostDto.getPassword()));</span>
+<span class="nc" id="L55">        user.setEmail(usersPostDto.getEmail());</span>
+<span class="nc" id="L56">        user.setRole(rolesRepository.findByRoleName(StaticConfig.DefaultRole).orElseThrow());</span>
+
+<span class="nc" id="L58">        usersRepository.save(user);</span>
+
+<span class="nc" id="L60">        return true;</span>
+    }
+
+    @Transactional
+    public UsersGetDto updateLastLoginTimestamp(String username) {
+<span class="nc" id="L65">        Users user = usersRepository.findByUsername(username).orElseThrow(() -&gt;</span>
+<span class="nc" id="L66">                new UsernameNotFoundException(String.format(&quot;Username %s not found&quot;, username)));</span>
+<span class="nc" id="L67">        user.setLastLoginTimestamp(OffsetDateTime.now());</span>
+<span class="nc" id="L68">        usersRepository.save(user);</span>
+<span class="nc" id="L69">        return usersMapper.fromEntity(user);</span>
+    }
+
+    public boolean uniqueEmail(String email) {
+<span class="nc" id="L73">        return usersRepository.findByEmail(email).isEmpty();</span>
+    }
+
+    public boolean uniqueUsername(String username) {
+<span class="nc" id="L77">        return usersRepository.findByUsername(username).isEmpty();</span>
+    }
+
+    @Transactional
+    public boolean changeUsername(UUID usersId, String newUsername) {
+<span class="nc" id="L82">        Users user = usersRepository.findById(usersId)</span>
+<span class="nc" id="L83">                                    .orElseThrow(() -&gt; new UserNotFoundException(&quot;Invalid UserID&quot;));</span>
+
+<span class="nc" id="L85">        user.setUsername(newUsername);</span>
+<span class="nc" id="L86">        usersRepository.save(user);</span>
+<span class="nc" id="L87">        return true;</span>
+    }
+
+    @Transactional
+    public boolean changeHeadImgUrl(UUID usersId, UsersImgPutDto usersImgPutDto) {
+<span class="nc" id="L92">        Users user = usersRepository.findById(usersId)</span>
+<span class="nc" id="L93">                                    .orElseThrow(() -&gt; new UserNotFoundException(&quot;Invalid UserID&quot;));</span>
+
+<span class="nc" id="L95">        user.setHeadImgUrl(usersImgPutDto.getHeadImgUrl());</span>
+<span class="nc" id="L96">        usersRepository.save(user);</span>
+<span class="nc" id="L97">        return true;</span>
+    }
+
+    @Transactional
+    public boolean changeProfileImgUrl(UUID usersId, UsersImgPutDto usersImgPutDto) {
+<span class="nc" id="L102">        Users user = usersRepository.findById(usersId)</span>
+<span class="nc" id="L103">                                    .orElseThrow(() -&gt; new UserNotFoundException(&quot;Invalid UserID&quot;));</span>
+
+<span class="nc" id="L105">        user.setProfileImgUrl(usersImgPutDto.getProfileImgUrl());</span>
+<span class="nc" id="L106">        usersRepository.save(user);</span>
+<span class="nc" id="L107">        return true;</span>
+    }
+
+    @Transactional
+    public boolean changeEmail(UUID usersId, String newEmail) {
+<span class="nc" id="L112">        Users user = usersRepository.findById(usersId)</span>
+<span class="nc" id="L113">                                    .orElseThrow(() -&gt; new UserNotFoundException(&quot;Invalid UserID&quot;));</span>
+
+<span class="nc" id="L115">        user.setEmail(newEmail);</span>
+<span class="nc" id="L116">        usersRepository.save(user);</span>
+
+<span class="nc" id="L118">        return true;</span>
+    }
+
+    @Transactional
+    public boolean changePassword(UUID usersId, UsersMiniPutDto usersMiniPutDto) {
+<span class="nc" id="L123">        Users user = usersRepository.findById(usersId)</span>
+<span class="nc" id="L124">                                    .orElseThrow(() -&gt; new UserNotFoundException(&quot;Invalid UserID&quot;));</span>
+
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        if (!passwordEncoder.matches(usersMiniPutDto.getOldPassword(), user.getPassword())) {</span>
+<span class="nc" id="L127">            throw new InvalidOldPasswordException(&quot;Old password is wrong&quot;);</span>
+        }
+
+<span class="nc" id="L130">        user.setPassword(passwordEncoder.encode(usersMiniPutDto.getNewPassword()));</span>
+<span class="nc" id="L131">        usersRepository.save(user);</span>
+<span class="nc" id="L132">        return true;</span>
+    }
+
+    @Transactional
+    public boolean resetPassword(UUID usersId, UsersPasswordPutDto password) {
+<span class="nc" id="L137">        Users user = usersRepository.findById(usersId)</span>
+<span class="nc" id="L138">                                    .orElseThrow(() -&gt; new UserNotFoundException(&quot;Invalid UserID&quot;));</span>
+
+<span class="nc" id="L140">        user.setPassword(passwordEncoder.encode(password.getPassword()));</span>
+<span class="nc" id="L141">        usersRepository.save(user);</span>
+<span class="nc" id="L142">        return true;</span>
+    }
+
+    @Transactional
+    public UsersGetDto getUserByUsername(String username) {
+<span class="nc" id="L147">        Optional&lt;Users&gt; targetUsers = usersRepository.findByUsername(username);</span>
+<span class="nc" id="L148">        return usersMapper.fromEntity(targetUsers.get());</span>
+    }
+
+    public List&lt;UsersGetDto&gt; getUserByContainingString(String string) {
+<span class="nc" id="L152">        List&lt;Users&gt; users = usersRepository.findByUsernameContainingIgnoreCase(string);</span>
+<span class="nc" id="L153">        List&lt;UsersGetDto&gt; usersGetDto = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">        for (Users user : users) {</span>
+<span class="nc" id="L155">            usersGetDto.add(usersMapper.fromEntity(user));</span>
+<span class="nc" id="L156">        }</span>
+<span class="nc" id="L157">        return usersGetDto;</span>
+    }
+
+    @Transactional
+    public List&lt;UsersGetDto&gt; getAllUsers() {
+<span class="nc" id="L162">        return usersRepository.findAll().stream()</span>
+<span class="nc" id="L163">                              .map(usersMapper::fromEntity)</span>
+<span class="nc" id="L164">                              .collect(Collectors.toList());</span>
+    }
+
+    @Transactional
+    public void changeSingleUserRole(UsersGetDto inputUserGetDto) {
+<span class="nc" id="L169">        Users userToUpdate = usersRepository.findById(inputUserGetDto.getId()).get();</span>
+<span class="nc" id="L170">        Roles newRoleOfUser = rolesRepository.findByRoleName(inputUserGetDto.getRole().getRoleName()).orElseThrow();</span>
+<span class="nc" id="L171">        userToUpdate.setRole(newRoleOfUser);</span>
+<span class="nc" id="L172">        usersRepository.save(userToUpdate);</span>
+<span class="nc" id="L173">    }</span>
+
+    @Transactional
+    public void changeUsersRoles(List&lt;UsersGetDto&gt; usersGetDtoList) {
+<span class="nc" id="L177">        usersGetDtoList.forEach(singleUserGetDto -&gt; changeSingleUserRole(singleUserGetDto));</span>
+<span class="nc" id="L178">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>
